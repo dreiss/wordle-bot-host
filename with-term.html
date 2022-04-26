@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>wordle_rs</title>
+    <!-- <title>XXX title</title> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"
+        integrity="sha512-iLYuqv+v/P4u9erpk+KM83Ioe/l7SEmr7wB6g+Kg1qmEit8EShDKnKtLHlv2QXUp7GGJhmqDI+1PhJYLTsfb8w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+    </style>
+</head>
+
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"
+        integrity="sha512-2PRgAav8Os8vLcOAh1gSaDoNLe1fAyq8/G3QSdyjFFD+OqNjLeHE/8q4+S4MEZgPsuo+itHopj+hJvqS8XUQ8A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <!-- // XXX path -->
+    <script type="text/javascript" src="./target/wasm32-unknown-emscripten/release/wordle_rs.js"></script>
+    <script type="module">
+        'use strict';
+
+        window.addEventListener("load", function (loadEvt) {
+            let term = new Terminal({
+                convertEol: true,
+                rows: 36,
+                fontFamily: "monospace",
+            });
+            term.open(document.getElementById("terminal"));
+
+            document.querySelector("#run-button").addEventListener("click", function (evt) {
+                term.reset();
+                let mod = {};
+                let rawCli = document.querySelector("#command-line").value;
+                mod.arguments = rawCli === "" ? "" : rawCli.split(" ");
+                let print = function (data) {
+                    term.write(data);
+                    term.write("\n");  // XXX garbage
+                };
+                mod.print = print;
+                mod.printErr = print;
+                mod.onExit = function (code) {
+                    console.log("Exited with code " + code);
+                }
+                runProgram(mod);
+            });
+        });
+    </script>
+    <input id="command-line" size="60" />
+    <button id="run-button">Run</button>
+    <div id="terminal"></div>
+</body>
+
+</html>

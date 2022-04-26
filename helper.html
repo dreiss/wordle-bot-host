@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Wordle Helper</title>
+    <style>
+        td.cell-color-b {
+            background-color: rgb(120, 124, 126);
+        }
+
+        td.cell-color-y {
+            background-color: rgb(201, 180, 88);
+        }
+
+        td.cell-color-g {
+            background-color: rgb(106, 170, 100);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- // XXX path -->
+    <script type="text/javascript" src="./target/wasm32-unknown-emscripten/release/wordle_rs.js"></script>
+    <script type="module">
+        'use strict';
+
+        import { createElement, Component, render } from 'https://unpkg.com/preact?module';
+        import htm from 'https://unpkg.com/htm?module';
+
+        const html = htm.bind(createElement);
+
+        class App extends Component {
+            constructor() {
+                super();
+                this.state = {
+                    query: "",
+                    advice: "",
+                };
+
+                let app = this;
+                document.body.addEventListener("keydown", function (evt) {
+                    app.key(evt);
+                });
+            }
+
+            render(_, { query, advice }) {
+                let rows = query.split(",").map((item) => html`<${GameRow} info=${item} />`)
+                return html`
+                    <div>
+                        <table border=1>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                        <p>${advice}</p>
+                    </div>`;
+            }
+
+            key(evt) {
+                let lcKey = evt.key.toLowerCase();
+                let query = this.state.query;
+                if (evt.key.length == 1 &&
+                    "abcdefghijklmnopqrstuvwxyz".includes(lcKey) &&
+                    !evt.ctrlKey && !evt.altKey && !evt.metaKey && !evt.repeat) {
+                    let words = query.split(",");
+                    let last = words[words.length - 1];
+                    let guess = last;
+                    let colors = "";
+                    if (last.includes(" ")) {
+                        [guess, colors] = last.split(" ");
+                    }
+                    if (guess.length < 5) {
+                        query = query.concat(lcKey);
+                        if (guess.length == 4) {
+                            query = query.concat(" ");
+                        }
+                    } else if (colors.length < 5) {
+                        if ("gyb".includes(lcKey)) {
+                            query = query.concat(lcKey);
+                            if (colors.length == 4) {
+                                query = query.concat(",");
+                            }
+                        }
+                    } else {
+                        throw "Invalid state: '" + this.state.query + "'";
+                    }
+                    this.setState({ query });
+                } else if (evt.key === "Enter") {
+                    if (query.endsWith(",")) {
+                        query = query.slice(0, -1);
+                        getHelp(this.props.mod, query).then((advice) => {
+                            this.setState({ advice });
+                        })
+                    }
+                } else if (evt.key === "Backspace") {
+                    if (query.endsWith(" ") || query.endsWith(",")) {
+                        query = query.slice(0, -1);
+                    }
+                    if (query !== "") {
+                        query = query.slice(0, -1);
+                    }
+                    this.setState({ query });
+                }
+            }
+        }
+
+        class GameRow extends Component {
+            render({ info }) {
+                let guess = info;
+                let colors = "";
+                if (info.includes(" ")) {
+                    [guess, colors] = info.split(" ");
+                }
+                while (guess.length < 5) {
+                    guess = guess.concat(" ");
+                }
+                while (colors.length < 5) {
+                    colors = colors.concat("w");
+                }
+                let cells = [...guess].map((g, i) =>
+                    html`<td class="cell-color-${colors[i]}">${g.toUpperCase()}</td/>`);
+                return html`<tr>${cells}</tr>`;
+            }
+        }
+
+        function prepareRuntime() {
+            let mod = {};
+            let print = function (data) {
+                console.log(data);
+            };
+            mod.print = print;
+            mod.printErr = print;
+            mod.noInitialRun = true;
+            runProgram(mod);
+            return mod;
+        }
+
+        function getHelp(mod, query) {
+            return mod.ready.then(() => {
+                let len = mod.lengthBytesUTF8(query) + 1;
+                let mem = mod.allocateUTF8(query);
+                try {
+                    let ret = mod._js_helper(mem, len);
+                    if (!ret) {
+                        console.log("oops");  // XXX
+                        return null;
+                    }
+                    let answer = mod.UTF8ToString(mem, 6);
+                    if (answer.length != 5) {
+                        return null;
+                    }
+                    return answer;
+                } finally {
+                    mod._free(mem);
+                }
+            });
+        }
+
+        window.addEventListener("load", function (loadEvt) {
+            let mod = prepareRuntime();
+            render(createElement(App, { mod }), document.body);
+        });
+    </script>
+</body>
+
+</html>
