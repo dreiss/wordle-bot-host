@@ -36,6 +36,7 @@
                 this.state = {
                     query: "",
                     advice: "",
+                    remaining_words: 2309,
                 };
 
                 let app = this;
@@ -44,7 +45,7 @@
                 });
             }
 
-            render(_, { query, advice }) {
+            render(_, { query, advice, remaining_words }) {
                 let rows = query.split(",").map((item) => html`<${GameRow} info=${item} />`)
                 return html`
                     <div>
@@ -54,6 +55,7 @@
                             </tbody>
                         </table>
                         <p>${advice}</p>
+                        <p>${remaining_words}</p>
                     </div>`;
             }
 
@@ -89,8 +91,8 @@
                 } else if (evt.key === "Enter") {
                     if (query.endsWith(",")) {
                         query = query.slice(0, -1);
-                        getHelp(this.props.mod, query).then((advice) => {
-                            this.setState({ advice });
+                        getHelp(this.props.mod, query).then(({ advice, remaining_words }) => {
+                            this.setState({ advice, remaining_words });
                         })
                     }
                 } else if (evt.key === "Backspace") {
@@ -146,11 +148,14 @@
                         console.log("oops");  // XXX
                         return null;
                     }
-                    let answer = mod.UTF8ToString(mem, 6);
-                    if (answer.length != 5) {
+                    let advice = mod.UTF8ToString(mem, 6);
+                    if (advice.length != 5) {
                         return null;
                     }
-                    return answer;
+                    let remaining_high = mod.getValue(mem + 6) & 0xFF;
+                    let remaining_low = mod.getValue(mem + 7) & 0xFF;
+                    let remaining_words = (remaining_high << 8) + remaining_low;
+                    return { advice, remaining_words };
                 } finally {
                     mod._free(mem);
                 }
